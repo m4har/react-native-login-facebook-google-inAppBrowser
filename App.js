@@ -1,114 +1,93 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- * @flow strict-local
- */
-
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {
-  SafeAreaView,
-  StyleSheet,
-  ScrollView,
   View,
+  Button,
+  Linking,
+  Alert,
+  Platform,
+  Image,
   Text,
-  StatusBar,
 } from 'react-native';
+import InAppBrowser from 'react-native-inappbrowser-reborn';
 
-import {
-  Header,
-  LearnMoreLinks,
-  Colors,
-  DebugInstructions,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
-
-const App: () => React$Node = () => {
-  return (
-    <>
-      <StatusBar barStyle="dark-content" />
-      <SafeAreaView>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          style={styles.scrollView}>
-          <Header />
-          {global.HermesInternal == null ? null : (
-            <View style={styles.engine}>
-              <Text style={styles.footer}>Engine: Hermes</Text>
-            </View>
-          )}
-          <View style={styles.body}>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Step One</Text>
-              <Text style={styles.sectionDescription}>
-                Edit <Text style={styles.highlight}>App.js</Text> to change this
-                screen and then come back to see your edits.
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>See Your Changes</Text>
-              <Text style={styles.sectionDescription}>
-                <ReloadInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Debug</Text>
-              <Text style={styles.sectionDescription}>
-                <DebugInstructions />
-              </Text>
-            </View>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Learn More</Text>
-              <Text style={styles.sectionDescription}>
-                Read the docs to discover what to do next:
-              </Text>
-            </View>
-            <LearnMoreLinks />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </>
-  );
+const getDeepLink = (path = '') => {
+  const scheme = 'jomblo';
+  const prefix =
+    Platform.OS == 'android' ? `${scheme}://login/` : `${scheme}://`;
+  return prefix + path;
 };
 
-const styles = StyleSheet.create({
-  scrollView: {
-    backgroundColor: Colors.lighter,
-  },
-  engine: {
-    position: 'absolute',
-    right: 0,
-  },
-  body: {
-    backgroundColor: Colors.white,
-  },
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.black,
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-    color: Colors.dark,
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-  footer: {
-    color: Colors.dark,
-    fontSize: 12,
-    fontWeight: '600',
-    padding: 4,
-    paddingRight: 12,
-    textAlign: 'right',
-  },
-});
+const App = () => {
+  const [state, setState] = useState({
+    isLogin: false,
+    name: '',
+    email: '',
+    photo: '',
+  });
+
+  useEffect(() => {
+    Linking.addEventListener('url', handleOpenURL);
+    Linking.getInitialURL().then(url => {
+      if (url) {
+        handleOpenURL({url});
+      }
+    });
+    return () => Linking.removeEventListener('url', handleOpenURL);
+  }, []);
+
+  const onPress = sosmed => async () => {
+    try {
+      const deepLink = getDeepLink('callback');
+      const url = `https://stormy-lake-44695.herokuapp.com/auth/${sosmed}/`;
+      if (await InAppBrowser.isAvailable()) {
+        InAppBrowser.openAuth(url, deepLink, {}).then(response => {
+          if (response.type === 'cancel') {
+            Alert.alert(response.type);
+          }
+        });
+      } else Linking.openURL(url);
+    } catch (error) {
+      Alert.alert(error.message);
+    }
+  };
+
+  const handleOpenURL = ({url}) => {
+    const [, user_string] = url.match(/user=([^#]+)/);
+    const response = JSON.parse(decodeURI(user_string));
+    const photo = response.picture.data?.url || response.picture;
+    setState(prev => ({
+      ...prev,
+      isLogin: true,
+      email: response.email,
+      name: response.name,
+      photo,
+    }));
+  };
+
+  return (
+    <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+      <Button
+        title="Login Google"
+        color="#DB4437"
+        onPress={onPress('google')}
+      />
+      <Button
+        title="Login Facebook"
+        color="#4267B2"
+        onPress={onPress('Facebook')}
+      />
+      {state.isLogin && (
+        <View style={{marginVertical: 20, alignItems: 'center'}}>
+          <Image
+            source={{uri: state.photo}}
+            style={{height: 100, width: 100}}
+          />
+          <Text>{state.email}</Text>
+          <Text>{state.name}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 export default App;
